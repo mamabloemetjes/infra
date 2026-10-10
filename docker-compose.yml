@@ -1,0 +1,46 @@
+services:
+  pg:
+    image: postgres:17            # keep 17: data directory is a v17 one
+    container_name: pg            # backup.sh uses `docker exec pg`
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:5432:5432"
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}   # only used on first init of an empty volume
+      POSTGRES_DB: mamabloemetjes-db
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    networks: [mamabloemetjes-net]
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mamabloemetjes-db"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7
+    container_name: redis
+    restart: unless-stopped
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+      REDISCLI_AUTH: ${REDIS_PASSWORD}          # lets redis-cli authenticate in the healthcheck
+    command: ["sh", "-c", "exec redis-server --requirepass \"$$REDIS_PASSWORD\" --appendonly yes"]
+    volumes:
+      - redis-data:/data
+    networks: [mamabloemetjes-net]
+    healthcheck:
+      test: ["CMD-SHELL", "redis-cli ping | grep -q PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:
+    external: true
+  redis-data:
+    external: true
+
+networks:
+  mamabloemetjes-net:
+    external: true
